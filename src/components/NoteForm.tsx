@@ -1,12 +1,13 @@
-import { Accessor, createEffect, createSignal, Resource, Show } from "solid-js";
+import { createEffect, createSignal, Resource, Show } from "solid-js";
 import { createRouteAction, redirect } from "solid-start";
 import MultiSelect from "./MultiSelect";
-import { createNote } from "~/db/note";
+import { createNote, editNote } from "~/db/note";
 import server$ from "solid-start/server";
-import Notes, { Note } from "~/routes/notes/(notes)";
+import { Note } from "~/routes/notes/(notes)";
 import { useNavigate } from "@solidjs/router";
 
 const createNote$ = server$(createNote);
+const editNote$ = server$(editNote);
 
 /**@TODO make these props depend on other props */
 type Props =
@@ -20,15 +21,23 @@ type Props =
     };
 
 export default function NoteForm({ tags, note }: Props) {
+  const editMode = !!note;
+  const action = editMode ? editNote$ : createNote$;
   const navigate = useNavigate();
-  const [, { Form }] = createRouteAction(async (formData: FormData) => {
-    const body = formData.get("body") as string;
+  const [noInput, setNoInput] = createSignal(note ? true : false);
+
+  const [_, { Form }] = createRouteAction(async (formData: FormData) => {
+    const content = formData.get("content") as string;
     const title = formData.get("title") as string;
     const tags = formData.getAll("tags") as string[];
+    const id = editMode ? note().id : "";
+    let n = { content, title, tags, id };
     try {
-      await createNote$(title, tags, body);
-      return redirect("/notes");
+      await action(n);
+      if (!editMode) return redirect("/notes");
+      return setNoInput(true);
     } catch (e) {}
+    throw new Error("something");
   });
 
   let titleEl: HTMLInputElement;
@@ -36,12 +45,6 @@ export default function NoteForm({ tags, note }: Props) {
 
   const [activeTags, setActiveTags] = createSignal([]);
   const [error, setError] = createSignal(false);
-  const [noInput, setNoInput] = createSignal(note ? true : false);
-
-  /**@TODO Fix this popin */
-  createEffect(
-    () => note && note().tags && setActiveTags(note().tags.map((t) => t.name))
-  );
 
   const handleSubmit = (e: SubmitEvent) => {
     if (
@@ -51,6 +54,7 @@ export default function NoteForm({ tags, note }: Props) {
     ) {
       setError(true);
       setTimeout(() => setError(false), 400);
+      e.preventDefault();
     }
   };
 
@@ -84,9 +88,8 @@ export default function NoteForm({ tags, note }: Props) {
               noInput={noInput}
               value={activeTags}
               options={tags}
-              onChange={(o) => {
-                setActiveTags(o);
-              }}
+              onChange={(o) => setActiveTags(o)}
+              resource={note}
             />
           </div>
         </div>
@@ -96,32 +99,32 @@ export default function NoteForm({ tags, note }: Props) {
               error() && contentEl?.value.trim() === "" && "animate-shake"
             }`}
           >
-            <label for="body">Body:</label>
+            <label for="content">Body:</label>
             <textarea
               disabled={noInput()}
               readonly={noInput()}
               ref={contentEl}
-              name="body"
+              name="content"
               class="w-full h-52"
-              id="body"
-              value="content"
+              id="content"
+              value={note ? note()?.content : ""}
             >
               {note && note()?.content}
             </textarea>
           </div>
         </div>
         <div class="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setNoInput(false)}
-            name="Edit"
-            class="h-8 w-20 rounded-md bg-green-500 m-3 text-white"
-          >
-            Edit
-          </button>
+          <Show when={editMode}>
+            <button
+              type="button"
+              onClick={() => setNoInput(false)}
+              class="h-8 w-20 rounded-md bg-green-500 m-3 text-white"
+            >
+              Edit
+            </button>
+          </Show>
           <input
             type="submit"
-            name="save"
             class={`h-8 w-20 rounded-md m-3 text-white ${
               noInput()
                 ? "bg-gray-500 hover:bg-gray-800"
@@ -132,7 +135,8 @@ export default function NoteForm({ tags, note }: Props) {
           <button
             type="button"
             onClick={() => {
-              if (noInput()) return navigate("..");
+              if (editMode && noInput()) return navigate("..");
+              if (!editMode && !noInput()) return navigate("..");
               setNoInput(true);
             }}
             class="group h-8 w-20 rounded-md border text-center m-3 hover:bg-gray-500"

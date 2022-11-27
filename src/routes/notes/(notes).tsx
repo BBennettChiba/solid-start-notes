@@ -8,8 +8,8 @@ import { getNotes, getTags } from "~/db/note";
 
 export function routeData() {
   const notes = createServerData$(async () => await getNotes());
-  const tags = createServerData$(async () =>
-    (await getTags())
+  const tags = createServerData$(
+    async () => await getTags()
     // .map((t) => t.name)
   );
   return { notes, tags };
@@ -48,12 +48,21 @@ export default function Notes() {
       </div>
       <div class="flex flex-row">
         <div class="flex flex-col w-1/2">
-          <label for="title-search">Title</label>
+          <label for="title-search" class="self-start ml-3">
+            Title
+          </label>
           <input type="text" id="title" class="h-full border p-2" />
         </div>
-        <div class="w-1/2">
-          <label for="tags">Tags</label>
-          <MultiSelect options={tags} onChange={onChange} value={value} />
+        <div class="w-1/2 flex flex-col">
+          <label for="tags" class="self-start ml-3">
+            Tags
+          </label>
+          <MultiSelect
+            options={tags}
+            onChange={onChange}
+            value={value}
+            singleSelect
+          />
         </div>
       </div>
       <form class="flex flex-wrap container">
