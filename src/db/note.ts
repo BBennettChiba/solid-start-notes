@@ -1,7 +1,8 @@
-import { PrismaClient, Note } from "@prisma/client";
-import { db } from "./index";
+import { PrismaClient } from "@prisma/client";
+import { db as db1 } from "./index";
 // const db = new PrismaClient();
-/**@TODO If move on from SQL Lite make this createMany */
+const db = db1 || new PrismaClient();
+
 export const createTag = async (name: string) => {
   try {
     const tag = await db.tag.create({ data: { name } });
@@ -19,7 +20,7 @@ export const createNote = async ({
   title: string;
   tags: string[];
   content: string;
-  id: string;
+  id?: string;
 }) => {
   try {
     const note = await db.note.create({
@@ -80,10 +81,10 @@ export const editNote = async ({
   tags,
   title,
 }: {
-  content: string;
+  content?: string;
   id: string;
-  tags: string[];
-  title: string;
+  tags?: string[];
+  title?: string;
 }) => {
   try {
     await db.note.update({ data: { tags: { set: [] } }, where: { id } });
@@ -92,7 +93,7 @@ export const editNote = async ({
         content,
         title,
         tags: {
-          connectOrCreate: tags.map((name) => ({
+          connectOrCreate: tags?.map((name) => ({
             create: { name },
             where: { name },
           })),
@@ -100,6 +101,14 @@ export const editNote = async ({
       },
       where: { id },
     });
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+export const deleteNote = async (id: string) => {
+  try {
+    await db.note.delete({ where: { id } });
   } catch (e) {
     console.log(e);
   }

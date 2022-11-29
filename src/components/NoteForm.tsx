@@ -1,26 +1,23 @@
 import { createEffect, createSignal, Resource, Show } from "solid-js";
 import { createRouteAction, redirect } from "solid-start";
 import MultiSelect from "./MultiSelect";
-import { createNote, editNote } from "~/db/note";
+import { createNote, deleteNote, editNote } from "~/db/note";
 import server$ from "solid-start/server";
-import { Note } from "~/routes/notes/(notes)";
 import { useNavigate } from "@solidjs/router";
+import Markdown from "./Markdown";
+import { Tags } from "../routes/notes/(notes)";
+import { NoteResource } from "~/routes/notes/[id]/(id)";
 
 const createNote$ = server$(createNote);
 const editNote$ = server$(editNote);
+const deleteNote$ = server$(deleteNote);
 
-/**@TODO make these props depend on other props */
-type Props =
-  | {
-      tags: Resource<{ name: string; id: string }[]>;
-      note?: never;
-    }
-  | {
-      tags: Resource<{ name: string; id: string }[]>;
-      note: Resource<Note>;
-    };
+type Props = {
+  tags: Tags;
+  note?: NoteResource;
+};
 
-export default function NoteForm({ tags, note }: Props) {
+export default function NoteForm({ note, tags }: Props) {
   const editMode = !!note;
   const action = editMode ? editNote$ : createNote$;
   const navigate = useNavigate();
@@ -30,9 +27,11 @@ export default function NoteForm({ tags, note }: Props) {
     const content = formData.get("content") as string;
     const title = formData.get("title") as string;
     const tags = formData.getAll("tags") as string[];
-    const id = editMode ? note().id : "";
+    const id = editMode ? note()?.id! : "";
+
     let n = { content, title, tags, id };
     try {
+      //@ts-ignore
       await action(n);
       if (!editMode) return redirect("/notes");
       return setNoInput(true);
@@ -43,7 +42,7 @@ export default function NoteForm({ tags, note }: Props) {
   let titleEl: HTMLInputElement;
   let contentEl: HTMLTextAreaElement;
 
-  const [activeTags, setActiveTags] = createSignal([]);
+  const [activeTags, setActiveTags] = createSignal<string[]>([]);
   const [error, setError] = createSignal(false);
 
   const handleSubmit = (e: SubmitEvent) => {
@@ -58,18 +57,28 @@ export default function NoteForm({ tags, note }: Props) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!note) return;
+    if (note.loading) return;
+    if (!note()) return;
+    note &&
+      deleteNote$(note()?.id!).then((e) => {
+        navigate("..");
+      });
+  };
+
   return (
     <div class="w-full items-center justify-center flex">
       <Form class="w-1/2 border" onSubmit={handleSubmit}>
         <div
           class={`flex flex-row ${
-            error() && titleEl?.value.trim() === "" && "animate-shake"
+            error() && titleEl!?.value.trim() === "" && "animate-shake"
           }`}
         >
           <div class="flex flex-col w-1/2">
             <label for="title">Title:</label>
             <input
-              ref={titleEl}
+              ref={titleEl!}
               class="h-full border p-2"
               type="text"
               name="title"
@@ -87,40 +96,52 @@ export default function NoteForm({ tags, note }: Props) {
             <MultiSelect
               noInput={noInput}
               value={activeTags}
-              options={tags}
-              onChange={(o) => setActiveTags(o)}
+              onChange={(o: string[]) => setActiveTags(o)}
               resource={note}
+              tags={tags}
             />
           </div>
         </div>
         <div class="flex flex-row w-full">
           <div
             class={`flex flex-col w-full ${
-              error() && contentEl?.value.trim() === "" && "animate-shake"
+              error() && contentEl!?.value.trim() === "" && "animate-shake"
             }`}
           >
             <label for="content">Body:</label>
-            <textarea
-              disabled={noInput()}
-              readonly={noInput()}
-              ref={contentEl}
-              name="content"
-              class="w-full h-52"
-              id="content"
-              value={note ? note()?.content : ""}
-            >
-              {note && note()?.content}
-            </textarea>
+            <Show when={!noInput()}>
+              <textarea
+                // disabled={noInput()}
+                // readonly={noInput()}
+                ref={contentEl!}
+                name="content"
+                class="w-full h-52 p-2"
+                id="content"
+                value={note ? note()?.content : ""}
+              >
+                {note && note()?.content}
+              </textarea>
+            </Show>
+            <Show when={noInput()}>
+              <Markdown note={note} />
+            </Show>
           </div>
         </div>
         <div class="flex justify-end">
           <Show when={editMode}>
             <button
               type="button"
-              onClick={() => setNoInput(false)}
+              onClick={() => setNoInput(!noInput())}
               class="h-8 w-20 rounded-md bg-green-500 m-3 text-white"
             >
-              Edit
+              {noInput() ? "Edit" : "Cancel"}
+            </button>
+            <button
+              type="button"
+              onclick={handleDelete}
+              class="h-8 w-20 rounded-md m-3 text-red-600 border-red-600 border-solid border-[1px] hover:bg-red-600 hover:text-white"
+            >
+              Delete
             </button>
           </Show>
           <input
@@ -134,16 +155,10 @@ export default function NoteForm({ tags, note }: Props) {
           />
           <button
             type="button"
-            onClick={() => {
-              if (editMode && noInput()) return navigate("..");
-              if (!editMode && !noInput()) return navigate("..");
-              setNoInput(true);
-            }}
+            onClick={() => navigate("..")}
             class="group h-8 w-20 rounded-md border text-center m-3 hover:bg-gray-500"
           >
-            <div class="group-hover:scale-110 transition-all">
-              {noInput() ? "Back" : "Cancel"}
-            </div>
+            <div class="group-hover:scale-110 transition-all">Back</div>
           </button>
         </div>
       </Form>

@@ -23,7 +23,7 @@ function validatePassword(password: unknown) {
 
 export function routeData() {
   return createServerData$(async (_, { request }) => {
-    if (await getUser(db, request)) {
+    if (await getUser(db!, request)) {
       throw redirect("/");
     }
     return {};
@@ -68,7 +68,7 @@ export default function Login() {
         return createUserSession(`${user.id}`, redirectTo);
       }
       case "register": {
-        const userExists = await db.user.findUnique({ where: { username } });
+        const userExists = await db!.user.findUnique({ where: { username } });
         if (userExists) {
           throw new FormError(`User with username ${username} already exists`, {
             fields,
@@ -92,34 +92,55 @@ export default function Login() {
   });
 
   return (
-    <main>
-      <h1>Login</h1>
-      <Form>
+    <main class="my-0 mx-auto rounded-2xl p-4 bg-blue-300 w-1/4">
+      <h1 class="m-0">Login</h1>
+      <Form class="flex flex-col">
         <input
           type="hidden"
           name="redirectTo"
           value={params.redirectTo ?? "/"}
         />
-        <fieldset>
+        <fieldset class="border-none py-4 flex justify-around">
           <legend>Login or Register?</legend>
           <label>
-            <input type="radio" name="loginType" value="login" checked={true} />{" "}
+            <input
+              class="mt-0 mr-0 mb-1 ml-0 flex p-1 border-2 border-solid border-black"
+              type="radio"
+              name="loginType"
+              value="login"
+              checked={true}
+            />
             Login
           </label>
           <label>
-            <input type="radio" name="loginType" value="register" /> Register
+            <input
+              class="mt-0 mr-0 mb-1 ml-0 flex p-1 border-2 border-solid border-black"
+              type="radio"
+              name="loginType"
+              value="register"
+            />
+            Register
           </label>
         </fieldset>
         <div>
           <label for="username-input">Username</label>
-          <input name="username" placeholder="kody" />
+          <input
+            class="mt-0 mr-0 mb-1 ml-0 flex p-1 border-2 border-solid border-black"
+            name="username"
+            placeholder="kody"
+          />
         </div>
         <Show when={loggingIn.error?.fieldErrors?.username}>
           <p role="alert">{loggingIn.error.fieldErrors.username}</p>
         </Show>
         <div>
           <label for="password-input">Password</label>
-          <input name="password" type="password" placeholder="twixrox" />
+          <input
+            class="mt-0 mr-0 mb-1 ml-0 flex p-1 border-2 border-solid border-black"
+            name="password"
+            type="password"
+            placeholder="twixrox"
+          />
         </div>
         <Show when={loggingIn.error?.fieldErrors?.password}>
           <p role="alert">{loggingIn.error.fieldErrors.password}</p>

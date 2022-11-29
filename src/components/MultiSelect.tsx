@@ -6,26 +6,36 @@ import {
   Accessor,
   Show,
 } from "solid-js";
-import { Note } from "~/routes/notes/(notes)";
+import { Note, Tag, User } from "@prisma/client";
+import { Tags } from "~/routes/notes/(notes)";
 
-type Option = { name: string; id: string };
+type NoteResource =
+  | Resource<
+      | (Note & {
+          user: User;
+          tags: Tag[];
+        })
+      | null
+      | undefined
+    >
+  | undefined;
 
 type Props = {
   value: Accessor<string[]>;
   onChange: (value: string[]) => void;
-  options: Resource<Option[]>;
   noInput?: Accessor<boolean>;
-  resource?: Resource<Note>;
+  resource?: NoteResource;
   singleSelect?: boolean;
+  tags: Tags;
 };
 
 export default function MultiSelect({
   value,
-  options,
   onChange,
   noInput: noInput = () => false,
-  resource: resource = null,
+  resource: resource = undefined,
   singleSelect: singleSelect = false,
+  tags,
 }: Props) {
   const [display, setDisplay] = createSignal(false);
   const [highlightedIndex, setHighlightedIndex] = createSignal(0);
@@ -35,12 +45,12 @@ export default function MultiSelect({
   let box: HTMLDivElement;
 
   createEffect(() => display() && setHighlightedIndex(0));
-  createEffect(
-    () =>
-      resource &&
-      resource().tags &&
-      onChange(resource().tags.map((t) => t.name))
-  );
+  createEffect(() => {
+    if (!resource || resource.loading || !resource()?.tags) return;
+    onChange(resource()?.tags.map((t) => t.name)!);
+  });
+
+  createEffect(() => console.log(resource && resource()));
 
   const clear = (e: MouseEvent) => {
     e.stopPropagation();
@@ -64,7 +74,7 @@ export default function MultiSelect({
   return (
     <>
       <Show when={noInput()}>
-        <div class="text-left relative w-full min-h-[1.5em] border-gray-700 border-solid border-[1px] rounded-md flex items-center gap-2 p-2 outline-none focus:border-blue-400">
+        <div class="text-left relative w-full min-h-[2em] border-gray-700 border-solid border-[1px] rounded-md flex items-center gap-2 p-2 outline-none focus:border-blue-400">
           <span class="flex-grow flex gap-2 flex-wrap h-full">
             <Show when={!resource}>
               <For each={value()}>
@@ -75,14 +85,19 @@ export default function MultiSelect({
                 )}
               </For>
             </Show>
-            <Show when={resource()?.tags}>
-              <For each={resource().tags}>
-                {(v) => (
-                  <div class="group flex items-center border-solid border-gray-700 border-[0.05em] rounded-md px-[0.25rem] py-[0.015rem] gap-1 bg-none outline-none">
-                    {v.name}
-                  </div>
-                )}
-              </For>
+            <Show
+              when={resource && !resource.loading && resource()?.tags}
+              keyed
+            >
+              {(tags) => (
+                <For each={tags}>
+                  {(v) => (
+                    <div class="group flex items-center border-solid border-gray-700 border-[0.05em] rounded-md px-[0.25rem] py-[0.015rem] gap-1 bg-none outline-none">
+                      {v.name}
+                    </div>
+                  )}
+                </For>
+              )}
             </Show>
           </span>
         </div>
@@ -91,8 +106,8 @@ export default function MultiSelect({
         <div
           onBlur={() => setDisplay(false)}
           tabIndex={0}
-          ref={box}
-          class="text-left relative w-full min-h-[1.5em] border-gray-700 border-solid border-[1px] rounded-md flex items-center gap-2 p-2 outline-none focus:border-blue-400"
+          ref={box!}
+          class="text-left relative w-full min-h-[2em] border-gray-700 border-solid border-[1px] rounded-md flex items-center gap-2 p-2 outline-none focus:border-blue-400"
           onKeyDown={(e) => {
             const { code } = e;
             if (
@@ -150,11 +165,11 @@ export default function MultiSelect({
               <input type="text" disabled placeholder="Select ..." />
             </Show>
             <Show when={!singleSelect}>
-              <input class="hidden" ref={input} />
+              <input class="hidden" ref={input!} />
               <span
-                ref={input}
+                ref={input!}
                 contentEditable
-                class="min-w-[5px]"
+                class="min-w-[5px] max-h-[1.5em]"
                 role="textbox"
                 onInput={(e) => {
                   setDisplay(true);
@@ -167,11 +182,12 @@ export default function MultiSelect({
                   setDisplay(false);
                 }}
                 onKeyUp={(e) => {
-                  setInputValue(e.target.textContent);
-                  input.value = e.target.textContent;
+                  setInputValue(e.target.textContent || "");
+                  input.value = e.target.textContent || "";
                 }}
                 onkeydown={(e) => {
                   let deleting = e.code === "Backspace" || e.key === "Delete";
+                  if (!e.target.textContent) return;
                   if (
                     (e.target.textContent.length >= 20 && !deleting) ||
                     e.key === "Enter"
@@ -189,7 +205,7 @@ export default function MultiSelect({
             </Show>
           </span>
           <button
-            class="focus:scale-150 bg-none text-gray-700 border-none outline-none cursor-pointer padding-0 text-lg focus:text-black hover:text-gray-800"
+            class="max-h-[1.5em] m-0 focus:scale-150 bg-none text-gray-700 border-none outline-none cursor-pointer padding-0 text-md focus:text-black hover:text-gray-800"
             type="button"
             onClick={clear}
           >
@@ -212,7 +228,7 @@ export default function MultiSelect({
             } top-[calc(100%_+_0.25em)]`}
           >
             <For
-              each={options()
+              each={tags()
                 ?.map((a) => a.name)
                 ?.filter((o) => o.includes(inputValue()))}
             >

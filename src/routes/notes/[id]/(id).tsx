@@ -13,6 +13,8 @@ export function routeData({ params }: RouteDataArgs) {
   return { note, tags };
 }
 
+export type NoteResource = ReturnType<typeof routeData>["note"];
+
 export default function Id() {
   const { note, tags } = useRouteData<typeof routeData>();
   return (

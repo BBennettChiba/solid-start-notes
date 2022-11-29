@@ -10,30 +10,36 @@ export function routeData() {
   const notes = createServerData$(async () => await getNotes());
   const tags = createServerData$(
     async () => await getTags()
-    // .map((t) => t.name)
   );
   return { notes, tags };
 }
 
-export type Note = ReturnType<ReturnType<typeof routeData>["notes"]>[number];
-
 /**@TODO add created and updated dates  */
+
+export type Tags = ReturnType<typeof routeData>["tags"];
+export type Notes = ReturnType<typeof routeData>["notes"];
 
 export default function Notes() {
   const data = useRouteData<typeof routeData>();
   const { notes, tags } = data;
+
   const [value, setValue] = createSignal<string[]>([]);
+  const [title, setTitle] = createSignal("");
 
-  const hasTags = (notesArray: Note[], notesTags: string[]) =>
-    notesArray?.filter((n) =>
-      notesTags.every((t) => n.tags.map((ta) => ta.name).includes(t))
-    );
+  const filter = () =>
+    notes()
+      ?.filter((n) =>
+        value().every((t) => n.tags.map((ta) => ta.name).includes(t))
+      )
+      ?.filter((v) => v.title.includes(title()));
 
-  const filteredNotes = createMemo(() => hasTags(notes(), value()));
+  const filteredNotes = createMemo(() => filter());
 
   const onChange = (v: string[]) => {
     setValue(v);
   };
+
+  const handleInput = (s: string) => setTitle(s);
 
   return (
     <main class="text-center mx-auto text-gray-700 p-4 container">
@@ -51,21 +57,26 @@ export default function Notes() {
           <label for="title-search" class="self-start ml-3">
             Title
           </label>
-          <input type="text" id="title" class="h-full border p-2" />
+          <input
+            type="text"
+            id="title"
+            class="h-full border p-2"
+            onInput={(e) => handleInput(e.currentTarget.value)}
+          />
         </div>
         <div class="w-1/2 flex flex-col">
           <label for="tags" class="self-start ml-3">
             Tags
           </label>
           <MultiSelect
-            options={tags}
             onChange={onChange}
             value={value}
             singleSelect
+            tags={tags}
           />
         </div>
       </div>
-      <form class="flex flex-wrap container">
+      <form class="flex flex-wrap container justify-around">
         <For each={filteredNotes()}>
           {(note) => (
             <A href={`/notes/${note.id}`}>
